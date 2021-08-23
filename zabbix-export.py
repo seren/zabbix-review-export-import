@@ -312,9 +312,10 @@ def main(zabbix_, save_yaml, directory, only="all"):
     if only in ("all", "users", "screens", "actions", "dashboards", "usermacro"):
         logging.info("Processing users...")
         users = zabbix_.user.get(selectMedias="extend", selectUsrgrps="extend")
-        userid2user = {}  # key: userid, value: user alias
+        userid2user = {}  # key: userid, value: username
         for u in users:
-            userid2user[u["userid"]] = u["alias"]
+            print(u)
+            userid2user[u["userid"]] = u["username"]
             for ug in u["usrgrps"]:
                 ug.pop("usrgrpid", None)
             for m in u["medias"]:
@@ -328,7 +329,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
             dumps_json(
                 object="users",
                 data=users,
-                key="alias",
+                key="username",
                 save_yaml=save_yaml,
                 directory=directory,
                 drop_keys=["userid", "attempt_clock", "attempt_failed", "attempt_ip"],
@@ -393,7 +394,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
 
     if only in ("all", "screens", "dashboards"):
         logging.info("Processing screens...")
-
+    
         graphid2graph = {}  # key: graphid, value: "hostname,graphname"
         graphs = zabbix_.graph.get(
             output=["graphid", "name"], selectHosts=["name"], templated=False
@@ -403,7 +404,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 graphid2graph[g["graphid"]] = "{},{}".format(
                     g["hosts"][0]["name"], g["name"]
                 )
-
+    
         itemid2item = {}  # key: itemid, value: "hostname, key_"
         items = zabbix_.item.get(
             output=["key_", "itemid"], selectHosts=["name"], webitems=True
@@ -413,7 +414,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 itemid2item[i["itemid"]] = "{},{}".format(
                     i["hosts"][0]["name"], i["key_"]
                 )
-
+    
         itemid2proto = {}  # key: itemid, value: "hostname, key_"
         itemprototypes = zabbix_.itemprototype.get(
             output=["key_", "itemid"], selectHosts=["name"]
@@ -423,7 +424,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 itemid2proto[i["itemid"]] = "{},{}".format(
                     i["hosts"][0]["name"], i["key_"]
                 )
-
+    
         graphid2proto = {}  # key: graphid, value: "hostname, graphname"
         graphprototypes = zabbix_.graphprototype.get(
             output=["graphid", "name"], selectHosts=["name"]
@@ -433,63 +434,63 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 graphid2proto[gp["graphid"]] = "{},{}".format(
                     gp["hosts"][0]["name"], gp["name"]
                 )
-
-        screens = zabbix_.screen.get(
-            selectUsers="extend", selectUserGroups="extend", selectScreenItems="extend"
-        )
-        for screen in screens:
-            # resolve users/usergroups/screenitems:
-            screen["userid"] = userid2user[screen["userid"]]
-            screen["users"] = [
-                {
-                    "permission": user["permission"],
-                    "userid": userid2user[user["userid"]],
-                }
-                for user in screen["users"]
-            ]
-            screen["userGroups"] = [
-                {
-                    "permission": group["permission"],
-                    "usrgrpid": usergroupid2usergroup[group["usrgrpid"]],
-                }
-                for group in screen["userGroups"]
-            ]
-            for si in screen["screenitems"]:
-                si.pop("screenid", None)
-                si.pop("screenitemid", None)
-                if si["resourcetype"] == "0":  # graph
-                    si["resourceid"] = graphid2graph[si["resourceid"]]
-                elif si["resourcetype"] == "1":  # simple graph
-                    si["resourceid"] = itemid2item[si["resourceid"]]
-                elif si["resourcetype"] == "2":  # map
-                    pass
-                elif si["resourcetype"] == "3":  # plain text
-                    pass  # FIXME
-                elif si["resourcetype"] == "5":  # triggers info
-                    pass
-                elif si["resourcetype"] == "8":  # screen
-                    pass
-                elif si["resourcetype"] == "9":  # triggers overview
-                    pass
-                elif si["resourcetype"] == "10":  # data overview
-                    si["resourceid"] = groupid2group[si["resourceid"]]
-                elif si["resourcetype"] == "14":  # latest host group issues
-                    pass
-                elif si["resourcetype"] == "16":  # latest host issues
-                    pass
-                elif si["resourcetype"] == "19":  # simple graph prototype
-                    si["resourceid"] = itemid2proto[si["resourceid"]]
-                elif si["resourcetype"] == "20":  # graph prototype
-                    si["resourceid"] = graphid2proto[si["resourceid"]]
-
-        if only in ("all", "screens"):
-            dumps_json(
-                object="screens",
-                data=screens,
-                save_yaml=save_yaml,
-                directory=directory,
-                drop_keys=["screenid"],
-            )
+    
+        # screens = zabbix_.screen.get(
+        #     selectUsers="extend", selectUserGroups="extend", selectScreenItems="extend"
+        # )
+        # for screen in screens:
+        #     # resolve users/usergroups/screenitems:
+        #     screen["userid"] = userid2user[screen["userid"]]
+        #     screen["users"] = [
+        #         {
+        #             "permission": user["permission"],
+        #             "userid": userid2user[user["userid"]],
+        #         }
+        #         for user in screen["users"]
+        #     ]
+        #     screen["userGroups"] = [
+        #         {
+        #             "permission": group["permission"],
+        #             "usrgrpid": usergroupid2usergroup[group["usrgrpid"]],
+        #         }
+        #         for group in screen["userGroups"]
+        #     ]
+        #     for si in screen["screenitems"]:
+        #         si.pop("screenid", None)
+        #         si.pop("screenitemid", None)
+        #         if si["resourcetype"] == "0":  # graph
+        #             si["resourceid"] = graphid2graph[si["resourceid"]]
+        #         elif si["resourcetype"] == "1":  # simple graph
+        #             si["resourceid"] = itemid2item[si["resourceid"]]
+        #         elif si["resourcetype"] == "2":  # map
+        #             pass
+        #         elif si["resourcetype"] == "3":  # plain text
+        #             pass  # FIXME
+        #         elif si["resourcetype"] == "5":  # triggers info
+        #             pass
+        #         elif si["resourcetype"] == "8":  # screen
+        #             pass
+        #         elif si["resourcetype"] == "9":  # triggers overview
+        #             pass
+        #         elif si["resourcetype"] == "10":  # data overview
+        #             si["resourceid"] = groupid2group[si["resourceid"]]
+        #         elif si["resourcetype"] == "14":  # latest host group issues
+        #             pass
+        #         elif si["resourcetype"] == "16":  # latest host issues
+        #             pass
+        #         elif si["resourcetype"] == "19":  # simple graph prototype
+        #             si["resourceid"] = itemid2proto[si["resourceid"]]
+        #         elif si["resourcetype"] == "20":  # graph prototype
+        #             si["resourceid"] = graphid2proto[si["resourceid"]]
+        #
+        # if only in ("all", "screens"):
+        #     dumps_json(
+        #         object="screens",
+        #         data=screens,
+        #         save_yaml=save_yaml,
+        #         directory=directory,
+        #         drop_keys=["screenid"],
+        #     )
 
     if only in ("all", "actions", "usermacro"):
         logging.info("Processing action...")
@@ -624,7 +625,8 @@ def main(zabbix_, save_yaml, directory, only="all"):
     if only in ("all", "dashboards"):
         logging.info("Processing dashboards...")
         dashboards = zabbix_.dashboard.get(
-            selectWidgets="extend", selectUsers="extend", selectUserGroups="extend"
+            # selectWidgets="extend", selectUsers="extend", selectUserGroups="extend"
+            selectPages="extend", selectUsers="extend", selectUserGroups="extend"
         )
         for d in dashboards:
             d["userid"] = userid2user[d["userid"]]
@@ -632,21 +634,24 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 u["userid"] = userid2user[u["userid"]]
             for ug in d["userGroups"]:
                 ug["usrgrpid"] = usergroupid2usergroup[ug["usrgrpid"]]
-            for w in d["widgets"]:
-                w.pop("widgetid", None)
-                w["fields"] = sorted(
-                    w["fields"], key=lambda i: i["name"]
-                )  # sort to stabilize dumps
-                for f in w["fields"]:
-                    if f["type"] == "4":  # item
-                        f["value"] = itemid2item[f["value"]]
-                    elif f["type"] == "5":  # item prototype
-                        f["value"] = itemid2proto[f["value"]]
-                    elif f["type"] == "6":  # graph
-                        f["value"] = graphid2graph[f["value"]]
-                    elif f["type"] == "7":  # graph prototype
-                        f["value"] = graphid2proto[f["value"]]
+            for p in d["pages"]:    
+                for w in p["widgets"]:
+                    w.pop("widgetid", None)
+                    w["fields"] = sorted(
+                        w["fields"], key=lambda i: i["name"]
+                    )  # sort to stabilize dumps
+                    for f in w["fields"]:
+                        if f["type"] == "4":  # item
+                            f["value"] = itemid2item[f["value"]]
+                        elif f["type"] == "5":  # item prototype
+                            f["value"] = itemid2proto[f["value"]]
+                        elif f["type"] == "6":  # graph
+                            f["value"] = graphid2graph[f["value"]]
+                        elif f["type"] == "7":  # graph prototype
+                            f["value"] = graphid2proto[f["value"]]
 
+        print(dashboards)
+        
         dumps_json(
             object="dashboards",
             data=dashboards,
