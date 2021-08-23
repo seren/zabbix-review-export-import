@@ -146,10 +146,10 @@ def get_usergroup_cache(zabbix):
 
 def get_users_cache(zabbix):
     "Return dict username=>userid or None on error"
-    result = zabbix.user.get(output=["alias", "userid"])
+    result = zabbix.user.get(output=["username", "userid"])
     user2userid = {}  # key: user alias, value: userid
     for u in result:
-        user2userid[u["alias"]] = int(u["userid"])
+        user2userid[u["username"]] = int(u["userid"])
     return user2userid
 
 
@@ -1365,54 +1365,60 @@ def import_dashboard(
             u["userid"] = user2userid[u["userid"]]
         for ug in yml["userGroups"]:
             ug["usrgrpid"] = usergroup2usergroupid[ug["usrgrpid"]]
-        for w in yml["widgets"]:
-            for f in w["fields"]:
-                if f["name"] == "graphid":
-                    f["value"] = graph2graphid[f["value"]]
+        for p in yml['pages']:
+            for w in p["widgets"]:
+                for f in w["fields"]:
+                    if f["name"] == "graphid":
+                        f["value"] = graph2graphid[f["value"]]
+    
+                if api_version >= parse_version("4.0"):
+                    if w["type"] == "stszbx":
+                        w["type"] = "systeminfo"
+                    elif w["type"] == "actlog":
+                        w["type"] = "actionlog"
+                    elif w["type"] == "dscvry":
+                        w["type"] = "discovery"
+                    elif w["type"] == "favgrph":
+                        w["type"] = "favgraphs"
+                    elif w["type"] == "favmap":
+                        w["type"] = "favmaps"
+                    elif w["type"] == "favscr":
+                        w["type"] = "favscreens"
+                    elif w["type"] == "sysmap":
+                        w["type"] = "map"
+                    elif w["type"] == "navigationtree":
+                        w["type"] = "navtree"
+                    elif w["type"] == "syssum":
+                        w["type"] = "systeminfo"
+                    elif w["type"] == "webovr":
+                        w["type"] = "web"
+                elif api_version < parse_version("4.0"):
+                    if w["type"] == "systeminfo":
+                        w["type"] = "stszbx"
+                    elif w["type"] == "actionlog":
+                        w["type"] = "actlog"
+                    elif w["type"] == "discovery":
+                        w["type"] = "dscvry"
+                    elif w["type"] == "favgraphs":
+                        w["type"] = "favgrph"
+                    elif w["type"] == "favmaps":
+                        w["type"] = "favmap"
+                    elif w["type"] == "favscreens":
+                        w["type"] = "favscr"
+                    elif w["type"] == "map":
+                        w["type"] = "sysmap"
+                    elif w["type"] == "navtree":
+                        w["type"] = "navigationtree"
+                    elif w["type"] == "systeminfo":
+                        w["type"] = "syssum"
+                    elif w["type"] == "web":
+                        w["type"] = "webovr"
 
-            if api_version >= parse_version("4.0"):
-                if w["type"] == "stszbx":
-                    w["type"] = "systeminfo"
-                elif w["type"] == "actlog":
-                    w["type"] = "actionlog"
-                elif w["type"] == "dscvry":
-                    w["type"] = "discovery"
-                elif w["type"] == "favgrph":
-                    w["type"] = "favgraphs"
-                elif w["type"] == "favmap":
-                    w["type"] = "favmaps"
-                elif w["type"] == "favscr":
-                    w["type"] = "favscreens"
-                elif w["type"] == "sysmap":
-                    w["type"] = "map"
-                elif w["type"] == "navigationtree":
-                    w["type"] = "navtree"
-                elif w["type"] == "syssum":
-                    w["type"] = "systeminfo"
-                elif w["type"] == "webovr":
-                    w["type"] = "web"
-            elif api_version < parse_version("4.0"):
-                if w["type"] == "systeminfo":
-                    w["type"] = "stszbx"
-                elif w["type"] == "actionlog":
-                    w["type"] = "actlog"
-                elif w["type"] == "discovery":
-                    w["type"] = "dscvry"
-                elif w["type"] == "favgraphs":
-                    w["type"] = "favgrph"
-                elif w["type"] == "favmaps":
-                    w["type"] = "favmap"
-                elif w["type"] == "favscreens":
-                    w["type"] = "favscr"
-                elif w["type"] == "map":
-                    w["type"] = "sysmap"
-                elif w["type"] == "navtree":
-                    w["type"] = "navigationtree"
-                elif w["type"] == "systeminfo":
-                    w["type"] = "syssum"
-                elif w["type"] == "web":
-                    w["type"] = "webovr"
-
+        # TODO plg: wieso hier löschen?
+        if api_version == "5.4.2":
+            del yml['uuid']
+            del yml['pages'][0]['dashboard_pageid']
+        
         result = zabbix.dashboard.create(yml)
     except ZabbixAPIException as e:
         if "already exist" in str(e):
@@ -1739,7 +1745,7 @@ if __name__ == "__main__":
         if args.type in ("autoguess", "action", "user"):
             mediatype2mediatypeid = get_mediatype_cache(zabbix_)
         if args.type in ("autoguess", "screen", "dashboard"):
-            screen2screenid = get_screen_cache(zabbix_)
+           # screen2screenid = get_screen_cache(zabbix_)
             graph2graphid = get_graph_cache(zabbix_)
             item2itemid = get_item_cache(zabbix_)
             itemproto2itemid = get_itemproto_cache(zabbix_)

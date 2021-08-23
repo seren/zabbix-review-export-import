@@ -314,7 +314,6 @@ def main(zabbix_, save_yaml, directory, only="all"):
         users = zabbix_.user.get(selectMedias="extend", selectUsrgrps="extend")
         userid2user = {}  # key: userid, value: username
         for u in users:
-            print(u)
             userid2user[u["userid"]] = u["username"]
             for ug in u["usrgrps"]:
                 ug.pop("usrgrpid", None)
