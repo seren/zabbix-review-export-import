@@ -649,8 +649,6 @@ def main(zabbix_, save_yaml, directory, only="all"):
                         elif f["type"] == "7":  # graph prototype
                             f["value"] = graphid2proto[f["value"]]
 
-        print(dashboards)
-        
         dumps_json(
             object="dashboards",
             data=dashboards,
