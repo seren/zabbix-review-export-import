@@ -1414,11 +1414,12 @@ def import_dashboard(
                     elif w["type"] == "web":
                         w["type"] = "webovr"
 
-        # TODO plg: wieso hier löschen?
-        if api_version == "5.4.2":
+        # TODO plg: why delete?
+        if api_version == parse_version("5.4.2"):
             del yml['uuid']
             del yml['pages'][0]['dashboard_pageid']
         
+              
         result = zabbix.dashboard.create(yml)
     except ZabbixAPIException as e:
         if "already exist" in str(e):
