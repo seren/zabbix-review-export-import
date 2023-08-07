@@ -23,7 +23,7 @@ def randompassword():
     )
 
 
-def get_zabbix_connection(zbx_url, zbx_user, zbx_password):
+def get_zabbix_connection(zbx_url, zbx_user=None, zbx_password=None, zbx_token=None):
     """
     Sometimes pyzabbix and py-zabbix library can replace each other.
     This is a wrapper, we don't care about what pip-module we install.
@@ -34,20 +34,24 @@ def get_zabbix_connection(zbx_url, zbx_user, zbx_password):
     try:
         zbx_pyzabbix = ZabbixAPI(zbx_url)
         zbx_pyzabbix.session.verify = False
-        zbx_pyzabbix.login(zbx_user, zbx_password)
+        if zbx_token:
+            zbx_pyzabbix.login(api_token=zbx_token)
+        else:
+            zbx_pyzabbix.login(zbx_user, zbx_password)
         return zbx_pyzabbix
     except Exception as e:
         logging.exception(e)
 
-    # py-zabbix library, with user\password in ZabbixAPI
-    logging.debug("Try connect to Zabbix by py-zabbix...")
-    try:
-        zbx_py_zabbix = ZabbixAPI(zbx_url, user=zbx_user, password=zbx_password)
-        zbx_py_zabbix.session.verify = False
-        return zbx_py_zabbix
-    except Exception as e:
-        logging.exception(e)
-    # choose good API
+    if not zbx_token:
+        # py-zabbix library, with user\password in ZabbixAPI
+        logging.debug("Try connect to Zabbix by py-zabbix...")
+        try:
+            zbx_py_zabbix = ZabbixAPI(zbx_url, user=zbx_user, password=zbx_password)
+            zbx_py_zabbix.session.verify = False
+            return zbx_py_zabbix
+        except Exception as e:
+            logging.exception(e)
+        # choose good API
 
     raise Exception("Some error in pyzabbix or py_zabbix module, see logs")
 
@@ -1370,7 +1374,7 @@ def import_dashboard(
                 for f in w["fields"]:
                     if f["name"] == "graphid":
                         f["value"] = graph2graphid[f["value"]]
-    
+
                 if api_version >= parse_version("4.0"):
                     if w["type"] == "stszbx":
                         w["type"] = "systeminfo"
@@ -1418,8 +1422,8 @@ def import_dashboard(
         if api_version == parse_version("5.4.2"):
             del yml['uuid']
             del yml['pages'][0]['dashboard_pageid']
-        
-              
+
+
         result = zabbix.dashboard.create(yml)
     except ZabbixAPIException as e:
         if "already exist" in str(e):
@@ -1627,16 +1631,22 @@ def parse_args():
         **environ_or_required("ZABBIX_URL")
     )
     parser.add_argument(
+        "--zabbix-token",
+        action="store",
+        help="API token. May be in ZABBIX_TOKEN env var",
+        default=os.environ.get("ZABBIX_TOKEN")
+    )
+    parser.add_argument(
         "--zabbix-username",
         action="store",
-        help="REQUIRED. May be in ZABBIX_USERNAME env var",
-        **environ_or_required("ZABBIX_USERNAME")
+        help="Required if no api token provided. May be in ZABBIX_USERNAME env var",
+        default=os.environ.get("ZABBIX_USERNAME")
     )
     parser.add_argument(
         "--zabbix-password",
         action="store",
-        help="REQUIRED. May be in ZABBIX_PASSWORD env var",
-        **environ_or_required("ZABBIX_PASSWORD")
+        help="Required if no api token provided. May be in ZABBIX_PASSWORD env var",
+        default=os.environ.get("ZABBIX_PASSWORD")
     )
 
     parser.add_argument(
@@ -1667,6 +1677,13 @@ def parse_args():
     parser.add_argument("FILE", help="YAML file to import from", nargs="+")
 
     args = parser.parse_args()
+
+    if args.zabbix_token and (args.zabbix_username or args.zabbix_password):
+            parser.error("If token is provided, username and password must not also be set")
+
+    if not args.zabbix_token and (not args.zabbix_username or not args.zabbix_password):
+        parser.error("Username and password must be set unless api token is set")
+
     return args
 
 

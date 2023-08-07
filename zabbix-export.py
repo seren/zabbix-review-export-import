@@ -37,7 +37,7 @@ def remove_none(obj):
         return obj
 
 
-def get_zabbix_connection(zbx_url, zbx_user, zbx_password):
+def get_zabbix_connection(zbx_url, zbx_user=None, zbx_password=None, zbx_token=None):
     """
     Sometimes pyzabbix and py-zabbix library can replace each other.
     This is a wrapper, we don't care about what pip-module we install.
@@ -48,20 +48,24 @@ def get_zabbix_connection(zbx_url, zbx_user, zbx_password):
     try:
         zbx_pyzabbix = ZabbixAPI(zbx_url)
         zbx_pyzabbix.session.verify = False
-        zbx_pyzabbix.login(zbx_user, zbx_password)
+        if zbx_token:
+            zbx_pyzabbix.login(api_token=zbx_token)
+        else:
+            zbx_pyzabbix.login(zbx_user, zbx_password)
         return zbx_pyzabbix
     except Exception as e:
         logging.exception(e)
 
-    # py-zabbix library, with user\password in ZabbixAPI
-    logging.debug("Try connect to Zabbix by py-zabbix...")
-    try:
-        zbx_py_zabbix = ZabbixAPI(zbx_url, user=zbx_user, password=zbx_password)
-        zbx_py_zabbix.session.verify = False
-        return zbx_py_zabbix
-    except Exception as e:
-        logging.exception(e)
-    # choose good API
+    if not zbx_token:
+        # py-zabbix library, with user\password in ZabbixAPI
+        logging.debug("Try connect to Zabbix by py-zabbix...")
+        try:
+            zbx_py_zabbix = ZabbixAPI(zbx_url, user=zbx_user, password=zbx_password)
+            zbx_py_zabbix.session.verify = False
+            return zbx_py_zabbix
+        except Exception as e:
+            logging.exception(e)
+        # choose good API
 
     raise Exception("Some error in pyzabbix or py_zabbix module, see logs")
 
@@ -393,7 +397,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
 
     if only in ("all", "screens", "dashboards"):
         logging.info("Processing screens...")
-    
+
         graphid2graph = {}  # key: graphid, value: "hostname,graphname"
         graphs = zabbix_.graph.get(
             output=["graphid", "name"], selectHosts=["name"], templated=False
@@ -403,7 +407,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 graphid2graph[g["graphid"]] = "{},{}".format(
                     g["hosts"][0]["name"], g["name"]
                 )
-    
+
         itemid2item = {}  # key: itemid, value: "hostname, key_"
         items = zabbix_.item.get(
             output=["key_", "itemid"], selectHosts=["name"], webitems=True
@@ -413,7 +417,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 itemid2item[i["itemid"]] = "{},{}".format(
                     i["hosts"][0]["name"], i["key_"]
                 )
-    
+
         itemid2proto = {}  # key: itemid, value: "hostname, key_"
         itemprototypes = zabbix_.itemprototype.get(
             output=["key_", "itemid"], selectHosts=["name"]
@@ -423,7 +427,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 itemid2proto[i["itemid"]] = "{},{}".format(
                     i["hosts"][0]["name"], i["key_"]
                 )
-    
+
         graphid2proto = {}  # key: graphid, value: "hostname, graphname"
         graphprototypes = zabbix_.graphprototype.get(
             output=["graphid", "name"], selectHosts=["name"]
@@ -433,7 +437,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 graphid2proto[gp["graphid"]] = "{},{}".format(
                     gp["hosts"][0]["name"], gp["name"]
                 )
-    
+
         # screens = zabbix_.screen.get(
         #     selectUsers="extend", selectUserGroups="extend", selectScreenItems="extend"
         # )
@@ -633,7 +637,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                 u["userid"] = userid2user[u["userid"]]
             for ug in d["userGroups"]:
                 ug["usrgrpid"] = usergroupid2usergroup[ug["usrgrpid"]]
-            for p in d["pages"]:    
+            for p in d["pages"]:
                 for w in p["widgets"]:
                     w.pop("widgetid", None)
                     w["fields"] = sorted(
@@ -676,16 +680,22 @@ def parse_args():
         **environ_or_required("ZABBIX_URL")
     )
     parser.add_argument(
+        "--zabbix-token",
+        action="store",
+        help="API token. May be in ZABBIX_TOKEN env var",
+        default=os.environ.get("ZABBIX_TOKEN")
+    )
+    parser.add_argument(
         "--zabbix-username",
         action="store",
-        help="REQUIRED. May be in ZABBIX_USERNAME env var",
-        **environ_or_required("ZABBIX_USERNAME")
+        help="Required if no api token provided. May be in ZABBIX_USERNAME env var",
+        default=os.environ.get("ZABBIX_USERNAME")
     )
     parser.add_argument(
         "--zabbix-password",
         action="store",
-        help="REQUIRED. May be in ZABBIX_PASSWORD env var",
-        **environ_or_required("ZABBIX_PASSWORD")
+        help="Required if no api token provided. May be in ZABBIX_PASSWORD env var",
+        default=os.environ.get("ZABBIX_PASSWORD")
     )
 
     parser.add_argument(
@@ -729,6 +739,13 @@ def parse_args():
     )
 
     args = parser.parse_args()
+
+    if args.zabbix_token and (args.zabbix_username or args.zabbix_password):
+            parser.error("If token is provided, username and password must not also be set")
+
+    if not args.zabbix_token and (not args.zabbix_username or not args.zabbix_password):
+        parser.error("Username and password must be set unless api token is set")
+
     return args
 
 
@@ -744,9 +761,12 @@ if __name__ == "__main__":
         level = logging.DEBUG
     init_logging(level=level)
 
-    zabbix_ = get_zabbix_connection(
-        args.zabbix_url, args.zabbix_username, args.zabbix_password
-    )
+    if args.zabbix_token:
+        zabbix_ = get_zabbix_connection(args.zabbix_url, zbx_token=args.zabbix_token)
+    else:
+        zabbix_ = get_zabbix_connection(
+            args.zabbix_url, zbx_user=args.zabbix_username, zbx_pass=args.zabbix_password
+        )
 
     logging.info("All files will be save in {}".format(os.path.abspath(args.directory)))
     main(
