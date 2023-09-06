@@ -24,7 +24,7 @@ def randompassword():
 
 
 def guess_yaml_type(yml, xml_exported=False):
-    "Return string of guessed YAML file type (group, host, ...)"
+    """Return string of guessed YAML file type (group, host, ...)"""
     try:
         if xml_exported:
             if "groups" in yml and "templates" not in yml and "hosts" not in yml:
