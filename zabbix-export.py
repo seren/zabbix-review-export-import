@@ -126,7 +126,7 @@ def dump_xml(object, txt, name, directory, save_yaml=False):
 
     # Remove bad lines from content
     # date
-    txt = re.sub(r"<date>.*<\/date>", "", txt)
+    txt = re.sub(r"<date>.*</date>", "", txt)
     # zabbix.version
     # txt = re.sub(r'<version>.*<\/version>', '', txt)
 
