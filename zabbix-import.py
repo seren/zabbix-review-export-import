@@ -23,39 +23,6 @@ def randompassword():
     )
 
 
-def get_zabbix_connection(zbx_url, zbx_user=None, zbx_password=None, zbx_token=None):
-    """
-    Sometimes pyzabbix and py-zabbix library can replace each other.
-    This is a wrapper, we don't care about what pip-module we install.
-    Return ZabbixAPI object
-    """
-    # pyzabbix library, with user\password in login method. It's GOOD library
-    logging.debug("Try connect to Zabbix by pyzabbix...")
-    try:
-        zbx_pyzabbix = ZabbixAPI(zbx_url)
-        zbx_pyzabbix.session.verify = False
-        if zbx_token:
-            zbx_pyzabbix.login(api_token=zbx_token)
-        else:
-            zbx_pyzabbix.login(zbx_user, zbx_password)
-        return zbx_pyzabbix
-    except Exception as e:
-        logging.exception(e)
-
-    if not zbx_token:
-        # py-zabbix library, with user\password in ZabbixAPI
-        logging.debug("Try connect to Zabbix by py-zabbix...")
-        try:
-            zbx_py_zabbix = ZabbixAPI(zbx_url, user=zbx_user, password=zbx_password)
-            zbx_py_zabbix.session.verify = False
-            return zbx_py_zabbix
-        except Exception as e:
-            logging.exception(e)
-        # choose good API
-
-    raise Exception("Some error in pyzabbix or py_zabbix module, see logs")
-
-
 def guess_yaml_type(yml, xml_exported=False):
     "Return string of guessed YAML file type (group, host, ...)"
     try:
@@ -1700,9 +1667,12 @@ if __name__ == "__main__":
         level = logging.DEBUG
     init_logging(level=level)
 
-    zabbix_ = get_zabbix_connection(
-        args.zabbix_url, args.zabbix_username, args.zabbix_password
-    )
+    zabbix_ = ZabbixAPI(args.zabbix_url)
+    zabbix_.session.verify = False
+    if args.zabbix_token:
+        zabbix_.login(api_token=args.zabbix_token)
+    else:
+        zabbix_.login(args.zabbix_username, args.zabbix_password)
 
     result = True  # Total success indicator
 
