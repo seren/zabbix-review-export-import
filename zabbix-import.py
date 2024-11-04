@@ -23,37 +23,8 @@ def randompassword():
     )
 
 
-def get_zabbix_connection(zbx_url, zbx_user, zbx_password):
-    """
-    Sometimes pyzabbix and py-zabbix library can replace each other.
-    This is a wrapper, we don't care about what pip-module we install.
-    Return ZabbixAPI object
-    """
-    # pyzabbix library, with user\password in login method. It's GOOD library
-    logging.debug("Try connect to Zabbix by pyzabbix...")
-    try:
-        zbx_pyzabbix = ZabbixAPI(zbx_url)
-        zbx_pyzabbix.session.verify = False
-        zbx_pyzabbix.login(zbx_user, zbx_password)
-        return zbx_pyzabbix
-    except Exception as e:
-        logging.exception(e)
-
-    # py-zabbix library, with user\password in ZabbixAPI
-    logging.debug("Try connect to Zabbix by py-zabbix...")
-    try:
-        zbx_py_zabbix = ZabbixAPI(zbx_url, user=zbx_user, password=zbx_password)
-        zbx_py_zabbix.session.verify = False
-        return zbx_py_zabbix
-    except Exception as e:
-        logging.exception(e)
-    # choose good API
-
-    raise Exception("Some error in pyzabbix or py_zabbix module, see logs")
-
-
 def guess_yaml_type(yml, xml_exported=False):
-    "Return string of guessed YAML file type (group, host, ...)"
+    """Return string of guessed YAML file type (group, host, ...)"""
     try:
         if xml_exported:
             if "groups" in yml and "templates" not in yml and "hosts" not in yml:
@@ -1370,7 +1341,7 @@ def import_dashboard(
                 for f in w["fields"]:
                     if f["name"] == "graphid":
                         f["value"] = graph2graphid[f["value"]]
-    
+
                 if api_version >= parse_version("4.0"):
                     if w["type"] == "stszbx":
                         w["type"] = "systeminfo"
@@ -1418,8 +1389,8 @@ def import_dashboard(
         if api_version == parse_version("5.4.2"):
             del yml['uuid']
             del yml['pages'][0]['dashboard_pageid']
-        
-              
+
+
         result = zabbix.dashboard.create(yml)
     except ZabbixAPIException as e:
         if "already exist" in str(e):
@@ -1627,16 +1598,22 @@ def parse_args():
         **environ_or_required("ZABBIX_URL")
     )
     parser.add_argument(
+        "--zabbix-token",
+        action="store",
+        help="API token. May be in ZABBIX_TOKEN env var",
+        default=os.environ.get("ZABBIX_TOKEN")
+    )
+    parser.add_argument(
         "--zabbix-username",
         action="store",
-        help="REQUIRED. May be in ZABBIX_USERNAME env var",
-        **environ_or_required("ZABBIX_USERNAME")
+        help="Required if no api token provided. May be in ZABBIX_USERNAME env var",
+        default=os.environ.get("ZABBIX_USERNAME")
     )
     parser.add_argument(
         "--zabbix-password",
         action="store",
-        help="REQUIRED. May be in ZABBIX_PASSWORD env var",
-        **environ_or_required("ZABBIX_PASSWORD")
+        help="Required if no api token provided. May be in ZABBIX_PASSWORD env var",
+        default=os.environ.get("ZABBIX_PASSWORD")
     )
 
     parser.add_argument(
@@ -1667,6 +1644,13 @@ def parse_args():
     parser.add_argument("FILE", help="YAML file to import from", nargs="+")
 
     args = parser.parse_args()
+
+    if args.zabbix_token and (args.zabbix_username or args.zabbix_password):
+            parser.error("If token is provided, username and password must not also be set")
+
+    if not args.zabbix_token and (not args.zabbix_username or not args.zabbix_password):
+        parser.error("Username and password must be set unless api token is set")
+
     return args
 
 
@@ -1683,9 +1667,12 @@ if __name__ == "__main__":
         level = logging.DEBUG
     init_logging(level=level)
 
-    zabbix_ = get_zabbix_connection(
-        args.zabbix_url, args.zabbix_username, args.zabbix_password
-    )
+    zabbix_ = ZabbixAPI(args.zabbix_url)
+    zabbix_.session.verify = False
+    if args.zabbix_token:
+        zabbix_.login(api_token=args.zabbix_token)
+    else:
+        zabbix_.login(args.zabbix_username, args.zabbix_password)
 
     result = True  # Total success indicator
 
