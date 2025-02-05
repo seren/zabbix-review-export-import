@@ -253,22 +253,33 @@ def main(zabbix_, save_yaml, directory, only="all"):
 
     if only in ("all", "usergroups", "screens", "actions", "dashboards", "usermacro"):
         logging.info("Processing usergroups...")
-        usergroups = zabbix_.usergroup.get(selectRights="extend")
-        usergroupid2usergroup = {}  # key: usergroupid, value: usergroup name
+        usergroups = zabbix_.usergroup.get(selectHostGroupRights="extend", selectTemplateGroupRights="extend")
+        usergroupid2name = {}  # key: usergroupid, value: usergroup name
         for ug in usergroups:
-            usergroupid2usergroup[ug["usrgrpid"]] = ug["name"]
+            usergroupid2name[ug["usrgrpid"]] = ug["name"]
 
         # existing hostgroups
         result = zabbix_.hostgroup.get(output=["groupid", "name"])
-        groupid2group = {}  # key: groupid, value: group name
+        hostgroupid2name = {}  # key: groupid, value: group name
         for group in result:
-            groupid2group[group["groupid"]] = group["name"]
+            hostgroupid2name[group["groupid"]] = group["name"]
 
-        # resolve hostgroupids:
+        # existing templategroups
+        result = zabbix_.templategroup.get(output=["groupid", "name"])
+        templategroupid2name = {}  # key: groupid, value: group name
+        for group in result:
+            templategroupid2name[group["groupid"]] = group["name"]
+
+
+        # resolve hostgroupids and templategroupid:
         for usergroup in usergroups:
-            usergroup["rights"] = [
-                {"id": groupid2group[r["id"]], "permission": r["permission"]}
-                for r in usergroup["rights"]
+            usergroup["hostgroup_rights"] = [
+                {"id": hostgroupid2name[r["id"]], "permission": r["permission"]}
+                for r in usergroup["hostgroup_rights"]
+            ]
+            usergroup["templategroup_rights"] = [
+                {"id": templategroupid2name[r["id"]], "permission": r["permission"]}
+                for r in usergroup["templategroup_rights"]
             ]
 
         if only in ("all", "usergroups"):
@@ -421,7 +432,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
         #     screen["userGroups"] = [
         #         {
         #             "permission": group["permission"],
-        #             "usrgrpid": usergroupid2usergroup[group["usrgrpid"]],
+        #             "usrgrpid": usergroupid2name[group["usrgrpid"]],
         #         }
         #         for group in screen["userGroups"]
         #     ]
@@ -506,7 +517,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                     "description": trigger["description"],
                     "host": trigger["hosts"][0]["name"] if trigger["hosts"] else "",
                 }
-        # resolve templateids/groupids/mediatypeids/userids/usergroupids:
+        # resolve templateids/hostgroupids/templategroupids/mediatypeids/userids/usergroupids:
         for action in actions:
             action["filter"]["conditions"] = sorted(
                 action["filter"]["conditions"], key=lambda i: i["formulaid"]
@@ -533,7 +544,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                             aa.pop("operationid", None)
                     if "opgroup" in op:
                         for aa in op["opgroup"]:
-                            aa["groupid"] = groupid2group[aa["groupid"]]
+                            aa["groupid"] = hostgroupid2name[aa["groupid"]]
                             aa.pop("operationid", None)
                     if "opmessage" in op:
                         op["opmessage"]["mediatypeid"] = mediatypeid2mediatype[
@@ -542,7 +553,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                         op["opmessage"].pop("operationid", None)
                     if "opmessage_grp" in op:
                         for aa in op["opmessage_grp"]:
-                            aa["usrgrpid"] = usergroupid2usergroup[aa["usrgrpid"]]
+                            aa["usrgrpid"] = usergroupid2name[aa["usrgrpid"]]
                             aa.pop("operationid", None)
                     if "opmessage_usr" in op:
                         for aa in op["opmessage_usr"]:
@@ -558,7 +569,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                             aa.pop("opcommand_hstid", None)
                     if "opcommand_grp" in op:
                         for aa in op["opcommand_grp"]:
-                            aa["groupid"] = groupid2group[aa["groupid"]]
+                            aa["groupid"] = hostgroupid2name[aa["groupid"]]
                             aa.pop("operationid", None)
                             aa.pop("opcommand_grpid", None)
                     if "opconditions" in op:
@@ -567,7 +578,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
                             aa.pop("opconditionid", None)
             for condition in action["filter"]["conditions"]:
                 if condition["conditiontype"] == "0":  # hostgroup
-                    condition["value"] = groupid2group[condition["value"]]
+                    condition["value"] = hostgroupid2name[condition["value"]]
                 if condition["conditiontype"] == "1":  # host
                     condition["value"] = hostid2host[condition["value"]]
                 if condition["conditiontype"] == "13":  # template
@@ -617,7 +628,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
             for u in d["users"]:
                 u["userid"] = userid2user[u["userid"]]
             for ug in d["userGroups"]:
-                ug["usrgrpid"] = usergroupid2usergroup[ug["usrgrpid"]]
+                ug["usrgrpid"] = usergroupid2name[ug["usrgrpid"]]
             for p in d["pages"]:
                 for w in p["widgets"]:
                     w.pop("widgetid", None)
