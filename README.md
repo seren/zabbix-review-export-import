@@ -1,3 +1,5 @@
+# NOTE: all new commits are against the "main" branch, not this "master" branch.
+
 # Zabbix Review and Export/Import
 With Zabbix review and export (backup)/import you can create review mechanism and save/restore zabbix configuration as code (Monitoring as Code)
 
