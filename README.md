@@ -1,3 +1,7 @@
+Fork note as of 2025-02-05:
+
+Export is mostly compatible with Zabbix 7.2.3 using the latest pyzabbix (1.3.1). Import has not been maintained since this repo was forked.
+
 # Zabbix Review and Export/Import
 With Zabbix review and export (backup)/import you can create review mechanism and save/restore zabbix configuration as code (Monitoring as Code)
 
