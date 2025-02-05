@@ -307,7 +307,7 @@ def main(zabbix_, save_yaml, directory, only="all"):
 
     if only in ("all", "proxy"):
         logging.info("Processing proxy...")
-        proxys = zabbix_.proxy.get(selectInterface="extend")
+        proxys = zabbix_.proxy.get()
         dumps_json(
             object="proxy",
             data=proxys,
